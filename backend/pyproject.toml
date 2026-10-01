@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-operations-agent-backend"
+version = "0.1.0"
+description = "FastAPI backend for the AI Operations Agent"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.14,<2",
+    "asyncpg>=0.30,<1",
+    "fastapi>=0.115,<1",
+    "mcp[cli]>=2.2,<3",
+    "ollama>=0.6.3,<1",
+    "sqlalchemy[asyncio]>=2.0,<3",
+    "uvicorn>=0.34,<1",
+]
+
+[project.optional-dependencies]
+test = [
+    "httpx>=0.28,<1",
+    "pytest>=8,<9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", ".."]
+addopts = "-m 'not integration'"
+markers = [
+    "integration: requires the seeded Docker PostgreSQL database",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

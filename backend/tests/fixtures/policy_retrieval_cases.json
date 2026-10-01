@@ -1,0 +1,10 @@
+[
+  {"query": "defective item refund", "policy_type": "refund", "sections": ["Defective or Damaged Items"]},
+  {"query": "refund processing time", "policy_type": "refund", "sections": ["Refund Processing"]},
+  {"query": "original payment method", "policy_type": "refund", "sections": ["Refund Method"]},
+  {"query": "size issue return", "policy_type": "return", "sections": ["Size-Related Returns"]},
+  {"query": "missing packaging accessories", "policy_type": "return", "sections": ["Packaging and Accessories"]},
+  {"query": "lost shipment tracking", "policy_type": "shipping", "sections": ["Lost or Damaged Shipments"]},
+  {"query": "expedited delivery", "policy_type": "shipping", "sections": ["Expedited Shipping"]},
+  {"query": "change delivery address", "policy_type": "shipping", "sections": ["Address Changes"]}
+]

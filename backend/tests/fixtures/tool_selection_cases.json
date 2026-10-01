@@ -1,0 +1,98 @@
+[
+  {
+    "id": "customer_orders",
+    "prompt": "Show the recent orders for customer 42.",
+    "expected_tool": "get_customer_orders",
+    "expected_argument_keys": ["customer_id"]
+  },
+  {
+    "id": "recent_refunds",
+    "prompt": "List refunds requested from 2026-09-01 through 2026-09-30.",
+    "expected_tool": "get_recent_refunds",
+    "expected_argument_keys": ["start_date", "end_date"]
+  },
+  {
+    "id": "limited_recent_refunds",
+    "prompt": "Give me the first 10 refunds between 2026-08-01 and 2026-08-31.",
+    "expected_tool": "get_recent_refunds",
+    "expected_argument_keys": ["start_date", "end_date", "limit"]
+  },
+  {
+    "id": "top_refunded_products",
+    "prompt": "Show me the top 3 products by refund rate from 2026-09-01 through 2026-09-30.",
+    "expected_tool": "get_top_refunded_products",
+    "expected_argument_keys": ["start_date", "end_date", "limit"]
+  },
+  {
+    "id": "top_refunded_products_threshold",
+    "prompt": "Rank the 5 most refunded products sold between 2026-07-01 and 2026-09-30, excluding products with fewer than 20 sold items.",
+    "expected_tool": "get_top_refunded_products",
+    "expected_argument_keys": ["start_date", "end_date", "limit", "min_sold_items"]
+  },
+  {
+    "id": "product_statistics",
+    "prompt": "What are the refund statistics for product 1 between 2026-09-01 and 2026-09-30?",
+    "expected_tool": "get_product_statistics",
+    "expected_argument_keys": ["product_id", "start_date", "end_date"]
+  },
+  {
+    "id": "refund_reasons",
+    "prompt": "What are the most common refund reasons during September 2026?",
+    "expected_tool": "get_refund_reason_breakdown",
+    "expected_argument_keys": ["start_date", "end_date"]
+  },
+  {
+    "id": "find_shoe_product",
+    "prompt": "Find the product ID for StridePro Running Shoes.",
+    "expected_tool": "find_products",
+    "expected_argument_keys": ["query"]
+  },
+  {
+    "id": "find_headphone_record",
+    "prompt": "Which product record matches Pulse Wireless Headphones?",
+    "expected_tool": "find_products",
+    "expected_argument_keys": ["query"]
+  },
+  {
+    "id": "casual_greeting",
+    "prompt": "Hello, how are you?",
+    "expected_tool": null,
+    "expected_argument_keys": []
+  },
+  {
+    "id": "general_knowledge",
+    "prompt": "What is the capital of France?",
+    "expected_tool": null,
+    "expected_argument_keys": []
+  },
+  {
+    "id": "writing_help",
+    "prompt": "Rewrite this sentence politely: Send the report today.",
+    "expected_tool": null,
+    "expected_argument_keys": []
+  },
+  {
+    "id": "return_size_policy",
+    "prompt": "What is the return policy for size issues?",
+    "expected_tool": "search_policy",
+    "expected_argument_keys": ["query"]
+  },
+  {
+    "id": "damaged_item_policy",
+    "prompt": "What policy applies when a customer receives a damaged item?",
+    "expected_tool": "search_policy",
+    "expected_argument_keys": ["query"]
+  },
+  {
+    "id": "lost_shipment_policy",
+    "prompt": "Look up the policy for a lost shipment.",
+    "expected_tool": "search_policy",
+    "expected_argument_keys": ["query"]
+  },
+  {
+    "id": "refund_processing_policy",
+    "prompt": "How long does policy say refund processing takes?",
+    "expected_tool": "search_policy",
+    "expected_argument_keys": ["query"]
+  }
+]
