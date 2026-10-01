@@ -28,7 +28,7 @@ flowchart LR
 | --- | --- |
 | React frontend | Task entry, NDJSON consumption, safe text rendering, tool trace, AbortController cancellation |
 | FastAPI API | Request validation, run lifecycle, safe streaming errors, development CORS, DB health |
-| AgentRuntime | Bounded model/tool loop, discovered ownership routing, tool observations, final answer |
+| AgentRuntime | Custom framework-independent agent harness core: bounded model/tool loop, discovered ownership routing, tool observations, failures, termination and observable events—not model reasoning |
 | LLMProvider | Typed chat boundary; OllamaProvider maps discovered schemas and parses structured tool calls |
 | OperationsMCPClient | Starts/discovers/invokes the operations stdio server; no repository imports |
 | PolicyMCPClient | Starts/discovers/invokes the policy stdio server; no policy parsing |

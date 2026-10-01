@@ -5,6 +5,10 @@ with policy rules, with observable tool execution instead of hidden reasoning.
 Built as a portfolio project: synthetic data, measured local evaluations, and
 explicitly documented model failures—not a public production service.
 
+The agent is driven by a small framework-independent harness built around
+`AgentRuntime`, which manages the bounded execution loop, MCP tool discovery and
+routing, structured observations, failures, and observable execution events.
+
 ## Problem
 
 Operational questions span structured records and internal rules: which products
@@ -29,6 +33,9 @@ The latter requires no tool invocation, although per-run MCP connections still o
 ## Architecture
 
 Browser → nginx → FastAPI → AgentRuntime → Ollama / MCP clients.
+`AgentRuntime` is the custom agent harness core: it owns orchestration, discovered
+tool registration and MCP client routing, observations, failure handling,
+termination, and observable events—not model reasoning.
 Operations MCP → repository → PostgreSQL; policy MCP → lexical search → known
 Markdown files. Ollama runs on the host; both stdio MCP servers run as subprocesses
 inside the API container. See [architecture](docs/architecture.md) for the diagram,
@@ -42,14 +49,36 @@ local Ollama with qwen2.5:7b; Docker Compose and nginx.
 
 ## How the Agent Works
 
-Each run discovers capabilities from both MCP servers, validates their expected
-tool sets, rejects duplicate names, and maps each name to its owning client.
-The model receives those discovered schemas. Tool calls execute sequentially;
-structured results or tool errors become observations for the next model turn.
-A final answer ends the run. Default `max_steps` is 5 model turns; the API accepts
-1–10. This bounds turns, not wall-clock time or the total calls within a turn.
+For each run, the custom harness discovers capabilities from both MCP servers,
+validates their expected tool sets, rejects duplicate names, and maps each name
+to its owning client.
+It sends messages and discovered schemas through `LLMProvider` to the model,
+which returns a final answer or one or more structured tool calls. The harness
+checks each proposed name against the discovered allowlist, rejects unknown tools
+before invocation, and routes allowed calls to their owning MCP clients.
+Calls execute sequentially; structured results or recoverable tool errors become
+observations in model context before the next model turn. A final answer ends the
+loop; reaching `max_steps` terminates it with an error.
+Default `max_steps` is 5 model turns; the API accepts 1–10. This bounds turns,
+not wall-clock time or the total calls within a turn.
 Infrastructure failures terminate safely; ordinary tool failures permit model-led
 recovery within that bound. There are no automatic retries or persistent sessions.
+
+The model proposes tool calls; the harness controls execution. Through
+`run_stream()`, the harness emits observable `AgentEvents`: execution state, not
+hidden model reasoning or chain-of-thought.
+
+### Agent harness vs related concepts
+
+| Concept | Role in this project |
+| --- | --- |
+| LLM | qwen2.5:7b generates responses and structured tool calls |
+| LLM adapter | `OllamaProvider` implements `LLMProvider` and isolates provider-specific behavior |
+| Agent harness | `AgentRuntime` and its orchestration/tool-execution boundary control multi-step execution |
+| Tool calling | The model selects a typed capability and arguments |
+| MCP client | Discovers and invokes MCP capabilities |
+| MCP server | Publishes typed operational capabilities |
+| Agent | The full model + harness + tools + context + execution-loop system |
 
 ## MCP Capabilities
 
@@ -116,6 +145,9 @@ Results are from the project's deterministic local evaluation fixtures.
 Model inference is not universally deterministic across versions/hardware.
 Answer checks test required terms/source references, not exhaustive factual
 correctness. One rank-as-ID dependent-grounding failure remains.
+Evaluations separate tool selection, retrieval quality, and end-to-end harness/agent
+behavior: selecting the right tool does not guarantee correctly grounded execution,
+as the documented 12/13 agent tool-behavior result demonstrates.
 See [evaluation scope and failure story](docs/evaluation.md).
 
 ## Docker Quick Start
@@ -295,6 +327,10 @@ failure; do not suppress it or describe the suite as entirely passing.
 
 Narrow typed SELECT tools, strict discovered tool sets, duplicate-name rejection,
 known-file-only policy access, and safe HTTP error messages reduce attack surface.
+The harness is an execution boundary: model-proposed names must belong to discovered
+tools, unknown names are rejected, and no `execute_sql` capability exists.
+`max_steps` bounds model turns; tool failures become structured observations while
+infrastructure failures terminate safely. This is not a complete security sandbox.
 Agent/LLM layers never access the repository or domain files directly. API health
 and maintenance scripts intentionally access the DB outside the agent path.
 Backend Docker runs non-root; ports bind loopback and build contexts exclude local
@@ -314,6 +350,13 @@ orchestration inspectable, lexical retrieval fits three small policies, and NDJS
 fits one request with server-to-client events. Host Ollama keeps local model/GPU
 management separate from the app stack. See [interview notes](docs/interview-notes.md)
 for concrete decision explanations and [CV bullets](docs/cv-bullets.md).
+
+**Why a custom agent harness instead of LangGraph?** The execution loop was
+implemented directly first to make discovery, routing, observations, stop conditions,
+and failure semantics explicit and demonstrate the underlying runtime mechanics.
+The current scope does not require a larger workflow state machine. LangGraph or
+another workflow framework could become useful for persistence, resumable workflows,
+complex branching, human approval, or larger state machines.
 
 ## Known Limitations
 
