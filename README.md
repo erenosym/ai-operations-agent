@@ -22,7 +22,7 @@ The agent will not receive an unrestricted arbitrary SQL execution tool.
 
 ## Current status
 
-The repository now contains the database-aware FastAPI health endpoint, asynchronous PostgreSQL layer, schema and seed data, typed business queries, independent read-only PostgreSQL and policy MCP servers, their application clients, an Ollama boundary, and a bounded multi-server agent runtime exposed through a streamed HTTP endpoint. Persistent conversations and the frontend are not implemented.
+The repository now contains the database-aware FastAPI health endpoint, asynchronous PostgreSQL layer, schema and seed data, typed business queries, independent read-only PostgreSQL and policy MCP servers, their application clients, an Ollama boundary, and a bounded multi-server agent runtime exposed through a streamed HTTP endpoint. A React operations workspace consumes that stream. Persistent conversations are not implemented.
 
 ## Relational schema
 
@@ -167,7 +167,7 @@ Both MCP servers use stdio. FastAPI exposes the runtime through `POST /agent/run
 
 The architecture is Client → FastAPI `/agent/run` → AgentRuntime → Ollama and
 the two MCP clients → stdio MCP servers → PostgreSQL / Markdown policies.
-The frontend and persistent conversation history are not implemented.
+The React frontend consumes this endpoint; persistent conversation history is not implemented.
 
 Start the backend from `backend/`:
 
@@ -225,6 +225,59 @@ PYTHONPATH=.:.. .venv/bin/python -m scripts.check_agent_api --message 'Hello.'
 ```
 
 ## Development infrastructure
+
+### React operations workspace
+
+The frontend uses React, TypeScript, Vite, plain hooks, and CSS. Its only application
+API is FastAPI. It never contacts Ollama, MCP servers, PostgreSQL, or policy files.
+
+```text
+Browser / React → FastAPI /agent/run → AgentRuntime → Ollama
+                                       └→ MCP clients
+                                           ├→ operations-postgres → PostgreSQL
+                                           └→ operations-policy → policy Markdown
+```
+
+With the existing seeded PostgreSQL database and local Ollama `qwen2.5:7b` available,
+start development from the repository root in separate terminals:
+
+```shell
+docker compose up -d postgres
+```
+
+```shell
+cd backend
+DATABASE_URL=postgresql+asyncpg://operations:operations@localhost:5432/operations \
+  FRONTEND_ORIGIN=http://localhost:5173 PYTHONPATH=.:.. \
+  .venv/bin/uvicorn app.main:app --host localhost --port 8001
+```
+
+```shell
+cd frontend
+npm install
+npm run dev
+```
+
+The UI defaults to `http://localhost:8001`. Set `VITE_API_BASE_URL` in
+`frontend/.env` to override it; `frontend/.env.example` shows the format. Vite exposes
+these values to browsers, so they must contain no secrets. Backend `FRONTEND_ORIGIN`
+permits one exact origin (default `http://localhost:5173`) for development CORS.
+
+Fetch consumes NDJSON incrementally, buffering partial lines and validating each
+event. The trace displays real tool events, expandable JSON, original product
+ordering, and policy source metadata. Answers render as safe plain text. Stop aborts
+the request and displays a neutral cancelled state; a new task clears the prior
+result. Nothing is persisted. Server error events, HTTP failures, malformed streams,
+and network interruption are presented separately from user cancellation.
+
+Frontend verification, from `frontend/`:
+
+```shell
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
 
 PostgreSQL runs in Docker Compose with data stored in a named volume. Copy `.env.example` to `.env`, then manage the service from the repository root:
 
