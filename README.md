@@ -4,11 +4,120 @@
 
 Build an AI operations agent that helps an e-commerce company analyze structured operational data and apply internal policy documents safely through narrow, typed tools.
 
+## Quick start: full Compose stack
+
+Prerequisites: Docker Compose and Ollama running on the host with `qwen2.5:7b`
+already installed (`ollama list` checks this). Compose does not start Ollama or pull
+models. Copy `.env.example` to `.env` and review the local development credentials.
+Run these commands from the repository root:
+
+```shell
+docker compose up --build -d
+docker compose run --rm api alembic upgrade head
+docker compose run --rm api python -m scripts.seed_database
+docker compose ps
+```
+
+Open **http://localhost:5173**. API health is at **http://localhost:8001/health**
+or **http://localhost:5173/api/health**. On an existing seeded database, skip seeding;
+the seed command intentionally refuses to overwrite existing rows. Migrations are
+explicit, so apply them before submitting agent tasks on first launch. Health checks
+verify database connectivity, not migration/seed completion or Ollama availability.
+
+```mermaid
+flowchart LR
+    browser[Browser] --> frontend["frontend: nginx / React"]
+    frontend -->|"/api/ — unbuffered"| api["api: FastAPI / AgentRuntime"]
+    api --> ollama["Host Ollama: qwen2.5:7b"]
+    api --> clients["MCP clients inside api"]
+    clients -->|stdio| operations["operations-postgres subprocess"]
+    clients -->|stdio| policy["operations-policy subprocess"]
+    operations --> postgres["postgres: PostgreSQL / named volume"]
+    policy --> files["Markdown policies inside api image"]
+```
+
+The API uses a non-root Python 3.13 slim runtime with `/app/backend`,
+`/app/mcp_servers`, and `/app/policies`. Both MCP servers are per-run Python
+subprocesses inside that container; there are no separate MCP services. The frontend
+uses a Node build stage and nginx to serve production assets. It embeds the relative
+API base `/api`, never a Docker hostname or host-specific API URL. nginx strips the
+`/api/` prefix and proxies to `api:8001`, with response/request buffering and caching
+disabled. Its 300-second idle timeout accommodates local inference; client disconnects
+close upstream requests so FastAPI can cancel the run and clean up MCP processes.
+
+### Compose configuration
+
+| Variable | Default / purpose |
+| --- | --- |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `operations`; local development defaults |
+| `DATABASE_URL` | Compose connection using `postgres:5432`; keep credentials and database synchronized with `POSTGRES_*` |
+| `DOCKER_OLLAMA_BASE_URL` | `http://host.docker.internal:11434`, passed as `OLLAMA_BASE_URL` inside api |
+| `OLLAMA_BASE_URL` | Host development default `http://localhost:11434`; not used as the Compose override |
+| `OLLAMA_MODEL` | `qwen2.5:7b` |
+| `FRONTEND_ORIGIN` | `http://localhost:5173`; host Vite CORS origin |
+| `FRONTEND_PORT`, `API_PORT`, `POSTGRES_PORT` | Host loopback ports `5173`, `8001`, `5432` |
+
+Container ports remain 80, 8001, and 5432. Stop host Vite/Uvicorn processes before
+using the same published ports, or override the host port variables. Inside Compose,
+PostgreSQL must use `postgres`, never `localhost`. Passwords containing URI-reserved
+characters must be URL-encoded in `DATABASE_URL`. Do not use these example credentials
+for a publicly exposed deployment.
+
+Docker Desktop provides host connectivity on macOS. A `host-gateway` mapping is also
+included for Linux. On Linux, a host Ollama service bound only to loopback may not
+accept container connections; configure its listening address and host firewall to
+allow the Docker network deliberately. Do not expose Ollama publicly. No host bind
+mounts are needed, and local `.env`, Git metadata, virtual environments, dependencies,
+and caches are excluded from image builds.
+
+### Database lifecycle and useful commands
+
+```shell
+docker compose logs --tail=100 api frontend postgres
+docker compose exec api python -m scripts.check_mcp_client
+docker compose exec api python -m scripts.check_policy_mcp_client
+docker compose exec api alembic check
+docker compose down
+docker compose up -d
+```
+
+`down` preserves the existing `postgres_data` named volume. **`docker compose down -v`
+deletes the database volume and all its data**; use it only for disposable environments.
+Migrations and seeding never run automatically. For an intentional development-data
+reset, use `docker compose run --rm api python -m scripts.seed_database --reset`.
+This replaces application rows; it is not a normal startup step.
+
+Services use `unless-stopped`. API startup waits for PostgreSQL health; frontend
+startup waits for API database health. API health does not launch MCP processes.
+Standard container stdout/stderr carries Uvicorn, nginx, and PostgreSQL diagnostics;
+MCP protocol stdout stays on the client's private subprocess pipe.
+
+To test an isolated fresh database without touching the normal project, use a unique
+project name and ports consistently for every command, for example:
+
+```shell
+POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15173 \
+  docker compose -p operations-compose-check up --build -d
+POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15173 \
+  docker compose -p operations-compose-check run --rm api alembic upgrade head
+POSTGRES_PORT=15432 API_PORT=18001 FRONTEND_PORT=15173 \
+  docker compose -p operations-compose-check run --rm api python -m scripts.seed_database
+```
+
+This is a local production-style stack, not an internet deployment: authentication,
+TLS, backups, and resource limits are not configured. The measured small-model
+dependent-ID grounding limitation remains; containerization does not change agent
+behavior. The Docker combined-analysis smoke run also selected the wrong ranked
+product for follow-up and used September 30 as the exclusive end date. Tool execution
+and streaming succeeded, but model-generated analysis still requires review.
+Host development remains supported below, using only the PostgreSQL service
+in Docker and running Vite, FastAPI, and Ollama on the host.
+
 ## Business use case
 
 The system is intended to answer operational questions that combine e-commerce records—such as customers, products, orders, order items, and refunds—with refund, return, and shipping policies. A representative task is analyzing recent refunds, ranking products by refund rate, identifying common reasons, retrieving the applicable policy, and summarizing the findings.
 
-## Planned high-level architecture
+## High-level architecture
 
 - PostgreSQL with relational e-commerce data modeling
 - Async SQLAlchemy and Alembic migrations
@@ -289,11 +398,11 @@ docker compose down
 
 `docker compose down` removes the container and network but preserves the database volume. `docker compose down -v` also permanently removes the local database volume and its data.
 
-Future application containers will connect to PostgreSQL at `postgres:5432`. Host-side tools normally connect through the published port at `localhost:5432`.
+The API container connects to PostgreSQL at `postgres:5432`. Host-side tools normally connect through the published port at `localhost:5432`.
 
-When running the backend directly on the host, override only the hostname for that process, for example with `DATABASE_URL=postgresql+asyncpg://operations:operations@localhost:5432/operations`. Keep the Compose-oriented default on `postgres:5432` for future containers.
+When running the backend directly on the host, override only the hostname for that process, for example with `DATABASE_URL=postgresql+asyncpg://operations:operations@localhost:5432/operations`. Keep the Compose-oriented default on `postgres:5432` for the API container.
 
-## Planned major milestones
+## Completed major milestones
 
 1. Define the relational schema, PostgreSQL environment, and migrations.
 2. Add deterministic seed data and database integration tests.
