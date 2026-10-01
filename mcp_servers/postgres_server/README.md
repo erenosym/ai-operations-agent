@@ -17,7 +17,7 @@ The development transport is stdio. From the repository root, run:
 PYTHONPATH=.:backend DATABASE_URL=postgresql+asyncpg://operations:operations@localhost:5432/operations backend/.venv/bin/python -m mcp_servers.postgres_server.server
 ```
 
-Use `postgres:5432` instead of `localhost:5432` when the process eventually runs inside Docker Compose. The server requires `DATABASE_URL`; it does not load or embed credentials itself.
+Use `postgres:5432` instead of `localhost:5432` inside Docker Compose. The server runs as an API-container subprocess and requires `DATABASE_URL`; it does not load or embed credentials itself.
 
 For the official MCP v2 Inspector workflow, install `uv` and Node.js/npm, then run from the repository root:
 

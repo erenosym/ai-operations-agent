@@ -2,7 +2,7 @@ from datetime import date, datetime, time, timedelta, timezone
 
 
 def date_range_utc(start_date: date, end_date: date) -> tuple[datetime, datetime]:
-    """Return an inclusive-start, exclusive-end UTC interval for whole dates."""
+    """Convert inclusive calendar dates to a half-open UTC timestamp interval."""
     if start_date > end_date:
         raise ValueError("start_date must be on or before end_date")
 

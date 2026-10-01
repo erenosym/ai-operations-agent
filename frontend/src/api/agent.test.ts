@@ -24,6 +24,10 @@ describe('NDJSON stream', () => {
   it('rejects invalid event shapes', async () => {
     await expect(collect(['{"type":"answer","content":5}\n'])).rejects.toThrow('invalid event')
   })
+  it.each(['\n', ''])('rejects an oversized complete event with terminator %j', async terminator => {
+    const event = JSON.stringify({ type: 'answer', content: 'x'.repeat(2_000_000) })
+    await expect(collect([event + terminator])).rejects.toThrow('exceeds the display limit')
+  })
   it('delivers an event before the network stream closes', async () => {
     let controller!: ReadableStreamDefaultController<Uint8Array>
     const input = new ReadableStream<Uint8Array>({ start(c) { controller = c } })

@@ -2,11 +2,14 @@ import { parseEvent, type AgentEvent } from '../types/agent'
 
 export class AgentAPIError extends Error {}
 
+const MAX_EVENT_CHARACTERS = 2_000_000
+
 export async function* readEvents(stream: ReadableStream<Uint8Array>): AsyncGenerator<AgentEvent> {
   const reader = stream.getReader()
   const decoder = new TextDecoder('utf-8', { fatal: true })
   let buffer = ''
   function parse(line: string) {
+    if (line.length > MAX_EVENT_CHARACTERS) throw new AgentAPIError('The server event exceeds the display limit.')
     try { return parseEvent(JSON.parse(line) as unknown) }
     catch { throw new AgentAPIError('The server sent an invalid event. Please try again.') }
   }
@@ -20,7 +23,7 @@ export async function* readEvents(stream: ReadableStream<Uint8Array>): AsyncGene
         buffer = buffer.slice(index + 1)
         if (line) yield parse(line)
       }
-      if (buffer.length > 2_000_000) throw new AgentAPIError('The server event exceeds the display limit.')
+      if (buffer.length > MAX_EVENT_CHARACTERS) throw new AgentAPIError('The server event exceeds the display limit.')
       if (done) break
     }
     if (buffer.trim()) yield parse(buffer)
